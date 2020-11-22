@@ -19,15 +19,15 @@
 
     //##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##
 
-    ( ()=>{
+    (() => {
 
-        var x = $('script');//<script>タグのものを配列に突っ込む
-        x[14].remove(); // 対象のタグを消す記述 x[14]がグラフを読み込むjs
+        let scriptsArray = $('script');//<script>タグのものを配列に突っ込む
+        scriptsArray[14].remove(); // 対象のタグを消す記述 x[14]がグラフを読み込むjs
 
         //なんでこれ必要？？  -->>一度読み込んだscriptタグはDOMから消しても効果は残るからそれを消すため
-        var y = $("html").clone().html(); // 対象のタグが消えたページをコピー
+        let copyPage = $("html").clone().html(); // 対象のタグが消えたページをコピー
         $("html").remove(); // ページをまるごと削除
-        document.write(y); // コピーしてあったページ内容をペースト
+        document.write(copyPage); // コピーしてあったページ内容をペースト
 
         //window.alert("11111")
 
@@ -49,24 +49,30 @@
 
     // const
     const MARGIN_VAL_X = 86400 * 30;
-    const MARGIN_VAL_Y_LOW = 100;
-    const MARGIN_VAL_Y_HIGH = 300;
-    const OFFSET_X = 50;
+    const MARGIN_VAL_Y_LOW = 100;//
+    const MARGIN_VAL_Y_HIGH = 300;//自分の最高レート+表示する領域
+    const OFFSET_X = 50;//グラフの位置?
     const OFFSET_Y = 5;
     const DEFAULT_WIDTH = 640;
-    var canvas_status = document.getElementById("ratingStatus");
+    let canvas_status = document.getElementById("ratingStatus");
+    // <canvas id="ratingStatus" width="1280" height="160" 
+    // style="max-width: 640px; max-height: 80px; height: 100%; width: 100%;"></canvas>
     const STATUS_WIDTH = canvas_status.width - OFFSET_X - 10;
     const STATUS_HEIGHT = canvas_status.height - OFFSET_Y - 5;
-    var canvas_graph = document.getElementById("ratingGraph");
+    let canvas_graph = document.getElementById("ratingGraph");
+    // <canvas id="ratingGraph" 
+    // width="1280" height="720" 
+    // style="max-width: 640px; max-height: 360px; height: 100%; width: 100%;"></canvas>
     const PANEL_WIDTH = canvas_graph.width - OFFSET_X - 10;
     const PANEL_HEIGHT = canvas_graph.height - OFFSET_Y - 30;
+    //HIGHEST:932　とかの吹き出しのサイズ
     const HIGHEST_WIDTH = 80;
     const HIGHEST_HEIGHT = 20;
     const LABEL_FONT = "12px Lato";
     const START_YEAR = 2010;
     const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const YEAR_SEC = 86400 * 365;
-    const STEP_SIZE = 400;
+    const STEP_SIZE = 400;//グラフのy軸のステップ数
     const COLORS = [
         [0, "#808080", 0.15],
         [400, "#804000", 0.15],
@@ -77,48 +83,58 @@
         [2400, "#FF8000", 0.2],
         [2800, "#FF0000", 0.1]
     ];
+
+    //??????????????????
     const STAR_MIN = 3200;
     const PARTICLE_MIN = 3;
     const PARTICLE_MAX = 20;
     const LIFE_MAX = 30;
     const EPS = 1e-9;
 
-    var cj = createjs;
-    var stage_graph, stage_status;
+    let cj = createjs;
+    let stage_graph, stage_status;
 
     // graph
-    var panel_shape, border_shape;
-    var chart_container, line_shape, vertex_shapes, highest_shape;
-    var n, x_min, x_max, y_min, y_max;
+    let panel_shape, border_shape;
+    let chart_container, line_shape, vertex_shapes, highest_shape;
+    let n, x_min, x_max, y_min, y_max;
 
     // status
-    var border_status_shape;
-    var rating_text, place_text, diff_text, date_text, contest_name_text;
-    var particles;
-    var standings_url;
+    let border_status_shape;
+    let rating_text, place_text, diff_text, date_text, contest_name_text;
+    let particles;
+    let standings_url;
 
-    function initStage(stage, canvas) {//いい感じにキャンバスの大きさを設定してマウスオーバーもONにする
-        var width = canvas.getAttribute('width');// <canvas width="">を取得
-        var height = canvas.getAttribute('height');
-        if (window.devicePixelRatio) {
+
+    //いい感じにキャンバスの大きさを設定してマウスオーバーもONにする
+    function initStage(stage, canvas) {
+        let width = canvas.getAttribute('width');// <canvas width="">を取得
+        let height = canvas.getAttribute('height');
+
+
+        //最悪、なくても画質悪くなったが動いた よくわからん
+        if (window.devicePixelRatio) {//ピクセル比 によって解像度を変える 本来は２のときに１にしたらぼやけた
+            //縦横の設定
             canvas.setAttribute('width', Math.round(width * window.devicePixelRatio));//Math.round()は四捨五入
             canvas.setAttribute('height', Math.round(height * window.devicePixelRatio));
             stage.scaleX = stage.scaleY = window.devicePixelRatio;
         }
+        //最大のキャンパスサイズ＝もとのキャンバスサイズにする
         canvas.style.maxWidth = width + "px";
         canvas.style.maxHeight = height + "px";
         canvas.style.width = canvas.style.height = "100%";
         stage.enableMouseOver();
     }
 
-    function newShape(parent) {//parentはステージのこと
-        var s = new cj.Shape();
+    //parent===stageに図形を追加し、その図形をreturnで参照渡し
+    function newShape(parent) {
+        let s = new cj.Shape();
         parent.addChild(s);
         return s;
     }
-
+    //上のテキストバージョン
     function newText(parent, x, y, font) {
-        var t = new cj.Text("", font, "#000");
+        let t = new cj.Text("", font, "#000");
         t.x = x;
         t.y = y;
         t.textAlign = "center";
@@ -127,51 +143,57 @@
         return t;
     }
 
-    function init() {//多分一番の大元
-       
+    //多分一番の大元
+    function init() {
+
         // window.alert('33333');
-        
+
+
+        //rating_history はHTML内で取得してある
+        //rating_history=[{"EndTime":時間(単位不明),"NewRating":11,"OldRating":0,"Place":5200,"ContestName":"コンテスト名","StandingsUrl":"/contests/m-solutions2020/standings?watching=kemkemG0"}];
         n = rating_history.length;
         if (n == 0) return;
 
-        stage_graph = new cj.Stage("ratingGraph");//createjs.Stage("canvasElementId");
+        //土台のステージ　これに図形とかを追加していくイメージ
+        stage_graph = new cj.Stage("ratingGraph");// Stage("canvasのID"); 
         stage_status = new cj.Stage("ratingStatus");
         initStage(stage_graph, canvas_graph);
         initStage(stage_status, canvas_status);
 
+        //グラフのサイズ決定
         x_min = 100000000000;
         x_max = 0;
         y_min = 10000;
         y_max = 0;
-        for (var i = 0; i < n; i++) {
+        for (let i = 0; i < n; i++) {
             x_min = Math.min(x_min, rating_history[i].EndTime);
             x_max = Math.max(x_max, rating_history[i].EndTime);
             y_min = Math.min(y_min, rating_history[i].NewRating);
             y_max = Math.max(y_max, rating_history[i].NewRating);
         }
-
-        //どこまで表示するかの設定
         x_min -= MARGIN_VAL_X;//最初にコンテストに参加した日ー1ヶ月
         x_max += MARGIN_VAL_X;//最後にコンテストに参加した日＋1ヶ月
         y_min = Math.min(1500, Math.max(0, y_min - MARGIN_VAL_Y_LOW));//いい感じに高さも設定
         y_max += MARGIN_VAL_Y_HIGH;
 
-        initBackground();
-        initChart();
+        initBackground();//背景の描画
+        initChart();//プロットと直線の描画
+        //init精進チャート()も加える
         stage_graph.update();
-        initStatus();
+        initStatus();//グラフの上のコンテスト情報とかの描画
         stage_status.update();
 
         //window.alert('44444');  アラート→描画の順番なのはなぜなのか
 
+
+        //マウスオーバー時のほわほわの管理
         cj.Ticker.setFPS(60);
         cj.Ticker.addEventListener("tick", handleTick);
-
         function handleTick(event) {
             updateParticles();
             stage_status.update();
         }
-       
+
 
     }
 
@@ -180,70 +202,86 @@
     }
 
     function getColor(x) {
-        for (var i = COLORS.length - 1; i >= 0; i--) {
+        for (let i = COLORS.length - 1; i >= 0; i--) {
             if (x >= COLORS[i][0]) return COLORS[i];
         }
         return [-1, "#000000", 0.1];
     }
 
     function initBackground() {
-        panel_shape = newShape(stage_graph);//stage_graphは関数内部でpanelを受け取り済み
+
+        panel_shape = newShape(stage_graph);//stage_graphに図形を追加、また panel_shapeはstage_graphの内部とつながってる(オブジェクトは参照渡し)
         panel_shape.x = OFFSET_X;
         panel_shape.y = OFFSET_Y;
         panel_shape.alpha = 0.3;
+
         border_shape = newShape(stage_graph);
         border_shape.x = OFFSET_X;
         border_shape.y = OFFSET_Y;
 
+        // testtest = newShape(stage_graph);
+        // testtest.graphics.beginFill("DarkRed"); // 赤色で描画するように設定
+        // testtest.graphics.drawCircle(0, 0, 10); //半径 100px の円を描画
+        // testtest.x = OFFSET_X; //OFFSET_XとOFFSET_Yにしたらグラフの中の四角形の左端になった
+        // testtest.y = OFFSET_Y;
+
+        //左の軸のレートの設定
         function newLabelY(s, y) {
-            var t = new cj.Text(s, LABEL_FONT, "#000");
-            t.x = OFFSET_X - 10;
+            let t = new cj.Text(s, LABEL_FONT, "#000");
+            t.x = OFFSET_X - 10;//理解
             t.y = OFFSET_Y + y;
             t.textAlign = "right";
             t.textBaseline = "middle";
             stage_graph.addChild(t);
         }
-
+        //上と同様にX軸のラベルの設定
         function newLabelX(s, x, y) {
-            var t = new cj.Text(s, LABEL_FONT, "#000");
+            let t = new cj.Text(s, LABEL_FONT, "#000");
             t.x = OFFSET_X + x;
             t.y = OFFSET_Y + PANEL_HEIGHT + 2 + y;
             t.textAlign = "center";
             t.textBaseline = "top";
             stage_graph.addChild(t);
         }
-        var y1 = 0;
-        for (var i = COLORS.length - 1; i >= 0; i--) {
-            var y2 = PANEL_HEIGHT - PANEL_HEIGHT * getPer(COLORS[i][0], y_min, y_max);
+
+        //https://createjs.com/docs/easeljs/classes/Graphics.html Graphics Classのドキュメント
+        let y1 = 0;
+
+        // グラフの中の正方形のパネルを色を設定
+        for (let i = COLORS.length - 1; i >= 0; i--) {
+            let y2 = PANEL_HEIGHT - PANEL_HEIGHT * getPer(COLORS[i][0], y_min, y_max);
             if (y2 > 0 && y1 < PANEL_HEIGHT) {
-                y1 = Math.max(y1, 0);
-                panel_shape.graphics.f(COLORS[i][1]).r(0, y1, PANEL_WIDTH, Math.min(y2, PANEL_HEIGHT) - y1);
+                y1 = Math.max(y1, 0);                           //rect ( x, y, w , h )
+                panel_shape.graphics.beginFill(COLORS[i][1]).rect(0, y1, PANEL_WIDTH, Math.min(y2, PANEL_HEIGHT) - y1);
             }
             y1 = y2;
         }
-        for (var i = 0; i <= y_max; i += STEP_SIZE) {
+        //Y軸ラベルの設定
+        for (let i = 0; i <= y_max; i += STEP_SIZE) {
             if (i >= y_min) {
-                var y = PANEL_HEIGHT - PANEL_HEIGHT * getPer(i, y_min, y_max);
+                let y = PANEL_HEIGHT - PANEL_HEIGHT * getPer(i, y_min, y_max);
                 newLabelY(String(i), y);
-                border_shape.graphics.s("#FFF").ss(0.5);
-                if (i == 2000) border_shape.graphics.s("#000");
-                border_shape.graphics.mt(0, y).lt(PANEL_WIDTH, y);
+                border_shape.graphics.beginStroke("#FFF").setStrokeStyle(0.5);
+                if (i == 2000) border_shape.graphics.beginStroke("#000");
+                border_shape.graphics.moveTo(0, y).lineTo(PANEL_WIDTH, y);
             }
         }
-        border_shape.graphics.s("#FFF").ss(0.5);
+        border_shape.graphics.beginStroke("#FFF").setStrokeStyle(0.5);
 
-        var month_step = 6;
-        for (var i = 3; i >= 1; i--) {
-            if (x_max - x_min <= YEAR_SEC * i + MARGIN_VAL_X * 2) month_step = i;
+        let month_step = 6;
+        for (let i = 3; i >= 1; i--) {
+            if (x_max - x_min <= YEAR_SEC * i + MARGIN_VAL_X * 2) month_step = i;//初めてすぐの人は短めに
         }
-        var first_flag = true;
-        for (var i = START_YEAR; i < 3000; i++) {
-            var break_flag = false;
-            for (var j = 0; j < 12; j += month_step) {
-                var month = ('00' + (j + 1)).slice(-2);
-                var unix = Date.parse(String(i) + "-" + month + "-01T00:00:00") / 1000;
+
+        //X軸ラベルの設定
+        let first_flag = true;
+        for (let i = START_YEAR; i < 3000; i++) {
+            let break_flag = false;
+            for (let j = 0; j < 12; j += month_step) {
+                let month = ('00' + (j + 1)).slice(-2);
+                let unix = Date.parse(String(i) + "-" + month + "-01T00:00:00") / 1000;
                 if (x_min < unix && unix < x_max) {
-                    var x = PANEL_WIDTH * getPer(unix, x_min, x_max);
+                    let x = PANEL_WIDTH * getPer(unix, x_min, x_max);
                     if (j == 0 || first_flag) {
                         newLabelX(MONTH_NAMES[j], x, 0);
                         newLabelX(String(i), x, 13);
@@ -279,13 +317,13 @@
             vertex_shapes[e.target.i].scaleX = vertex_shapes[e.target.i].scaleY = 1;
             stage_graph.update();
         };
-        var highest_i = 0;
-        for (var i = 0; i < n; i++) {
+        let highest_i = 0;
+        for (let i = 0; i < n; i++) {
             if (rating_history[highest_i].NewRating < rating_history[i].NewRating) {
                 highest_i = i;
             }
         }
-        for (var i = 0; i < n; i++) {
+        for (let i = 0; i < n; i++) {
             vertex_shapes.push(newShape(chart_container));
             vertex_shapes[i].graphics.s("#FFF");
             if (i == highest_i) vertex_shapes[i].graphics.s("#000");
@@ -293,30 +331,30 @@
             vertex_shapes[i].x = OFFSET_X + PANEL_WIDTH * getPer(rating_history[i].EndTime, x_min, x_max);
             vertex_shapes[i].y = OFFSET_Y + (PANEL_HEIGHT - PANEL_HEIGHT * getPer(rating_history[i].NewRating, y_min, y_max));
             vertex_shapes[i].i = i;
-            var hitArea = new cj.Shape();
+            let hitArea = new cj.Shape();
             hitArea.graphics.f("#000").dc(1.5, 1.5, 6);
             vertex_shapes[i].hitArea = hitArea;
             vertex_shapes[i].addEventListener("mouseover", mouseoverVertex);
             vertex_shapes[i].addEventListener("mouseout", mouseoutVertex);
         }
         {
-            var dx = 80;
+            let dx = 80;
             if ((x_min + x_max) / 2 < rating_history[highest_i].EndTime) dx = -80;
-            var x = vertex_shapes[highest_i].x + dx;
-            var y = vertex_shapes[highest_i].y - 16;
+            let x = vertex_shapes[highest_i].x + dx;
+            let y = vertex_shapes[highest_i].y - 16;
             highest_shape.graphics.s("#FFF").mt(vertex_shapes[highest_i].x, vertex_shapes[highest_i].y).lt(x, y);
             highest_shape.graphics.s("#888").f("#FFF").rr(x - HIGHEST_WIDTH / 2, y - HIGHEST_HEIGHT / 2, HIGHEST_WIDTH, HIGHEST_HEIGHT, 2);
             highest_shape.i = highest_i;
-            var highest_text = newText(stage_graph, x, y, "12px Lato");
+            let highest_text = newText(stage_graph, x, y, "12px Lato");
             highest_text.text = "Highest: " + rating_history[highest_i].NewRating;
             highest_shape.addEventListener("mouseover", mouseoverVertex);
             highest_shape.addEventListener("mouseout", mouseoutVertex);
         }
-        for (var j = 0; j < 2; j++) {
+        for (let j = 0; j < 2; j++) {
             if (j == 0) line_shape.graphics.s("#AAA").ss(2);
             else line_shape.graphics.s("#FFF").ss(0.5);
             line_shape.graphics.mt(vertex_shapes[0].x, vertex_shapes[0].y);
-            for (var i = 0; i < n; i++) {
+            for (let i = 0; i < n; i++) {
                 line_shape.graphics.lt(vertex_shapes[i].x, vertex_shapes[i].y);
             }
         }
@@ -333,7 +371,7 @@
         date_text.textAlign = contest_name_text.textAlign = "left";
         contest_name_text.maxWidth = STATUS_WIDTH - 200 - 10;
         {
-            var hitArea = new cj.Shape(); hitArea.graphics.f("#000").r(0, -12, contest_name_text.maxWidth, 24);
+            let hitArea = new cj.Shape(); hitArea.graphics.f("#000").r(0, -12, contest_name_text.maxWidth, 24);
             contest_name_text.hitArea = hitArea;
             contest_name_text.cursor = "pointer";
             contest_name_text.addEventListener("click", function () {
@@ -341,7 +379,7 @@
             });
         }
         particles = new Array();
-        for (var i = 0; i < PARTICLE_MAX; i++) {
+        for (let i = 0; i < PARTICLE_MAX; i++) {
             particles.push(newText(stage_status, 0, 0, "64px Lato"));
             particles[i].visible = false;
         }
@@ -349,8 +387,8 @@
     }
 
     function getRatingPer(x) {
-        var pre = COLORS[COLORS.length - 1][0] + STEP_SIZE;
-        for (var i = COLORS.length - 1; i >= 0; i--) {
+        let pre = COLORS[COLORS.length - 1][0] + STEP_SIZE;
+        for (let i = COLORS.length - 1; i >= 0; i--) {
             if (x >= COLORS[i][0]) return (x - COLORS[i][0]) / (pre - COLORS[i][0]);
             pre = COLORS[i][0];
         }
@@ -358,20 +396,20 @@
     }
 
     function getOrdinal(x) {
-        var s = ["th", "st", "nd", "rd"], v = x % 100;
+        let s = ["th", "st", "nd", "rd"], v = x % 100;
         return x + (s[(v - 20) % 10] || s[v] || s[0]);
     }
     function getDiff(x) {
-        var sign = x == 0 ? 'ﾂｱ' : (x < 0 ? '-' : '+');
+        let sign = x == 0 ? 'ﾂｱ' : (x < 0 ? '-' : '+');
         return sign + Math.abs(x);
     }
 
     function setStatus(data, particle_flag) {
-        var date = new Date(data.EndTime * 1000);
-        var rating = data.NewRating, old_rating = data.OldRating;
-        var place = data.Place;
-        var contest_name = data.ContestName;
-        var tmp = getColor(rating); var color = tmp[1], alpha = tmp[2];
+        let date = new Date(data.EndTime * 1000);
+        let rating = data.NewRating, old_rating = data.OldRating;
+        let place = data.Place;
+        let contest_name = data.ContestName;
+        let tmp = getColor(rating); let color = tmp[1], alpha = tmp[2];
         border_status_shape.graphics.c().s(color).ss(1).rr(OFFSET_X, OFFSET_Y, STATUS_WIDTH, STATUS_HEIGHT, 2);
         rating_text.text = rating;
         rating_text.color = color;
@@ -380,7 +418,7 @@
         date_text.text = date.toLocaleDateString();
         contest_name_text.text = contest_name;
         if (particle_flag) {
-            var particle_num = parseInt(Math.pow(getRatingPer(rating), 2) * (PARTICLE_MAX - PARTICLE_MIN) + PARTICLE_MIN);
+            let particle_num = parseInt(Math.pow(getRatingPer(rating), 2) * (PARTICLE_MAX - PARTICLE_MIN) + PARTICLE_MIN);
             setParticles(particle_num, color, alpha, rating);
         }
         standings_url = data.StandingsUrl;
@@ -389,8 +427,8 @@
     function setParticle(particle, x, y, color, alpha, star_flag) {
         particle.x = x;
         particle.y = y;
-        var ang = Math.random() * Math.PI * 2;
-        var speed = Math.random() * 4 + 4;
+        let ang = Math.random() * Math.PI * 2;
+        let speed = Math.random() * 4 + 4;
         particle.vx = Math.cos(ang) * speed;
         particle.vy = Math.sin(ang) * speed;
         particle.rot_speed = Math.random() * 20 + 10;
@@ -406,7 +444,7 @@
     }
 
     function setParticles(num, color, alpha, rating) {
-        for (var i = 0; i < PARTICLE_MAX; i++) {
+        for (let i = 0; i < PARTICLE_MAX; i++) {
             if (i < num) {
                 setParticle(particles[i], rating_text.x, rating_text.y, color, alpha, rating >= STAR_MIN);
             } else {
@@ -431,7 +469,7 @@
     }
 
     function updateParticles() {
-        for (var i = 0; i < PARTICLE_MAX; i++) {
+        for (let i = 0; i < PARTICLE_MAX; i++) {
             if (particles[i].life > 0) {
                 updateParticle(particles[i]);
             }
