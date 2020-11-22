@@ -19,18 +19,19 @@
 
     //##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##
 
-    $(window).on('load', function () {
+    ( ()=>{
 
         var x = $('script');//<script>タグのものを配列に突っ込む
         x[14].remove(); // 対象のタグを消す記述 x[14]がグラフを読み込むjs
 
+        //なんでこれ必要？？  -->>一度読み込んだscriptタグはDOMから消しても効果は残るからそれを消すため
+        var y = $("html").clone().html(); // 対象のタグが消えたページをコピー
+        $("html").remove(); // ページをまるごと削除
+        document.write(y); // コピーしてあったページ内容をペースト
 
+        //window.alert("11111")
 
-        // //なんでこれ必要？？
-        // var y = $("html").clone().html(); // 対象のタグが消えたページをコピー
-        // $("html").remove(); // ページをまるごと削除
-        // document.write(y); // コピーしてあったページ内容をペースト
-    })
+    })()
 
 
     //##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##
@@ -40,6 +41,9 @@
     "use strict";
 
     $(window).load(init);//ページの構成を全部把握してからinit()実行
+    //init()
+
+    // window.alert('22222');
 
     //クリエイトjsとやらをつかっている
 
@@ -124,6 +128,9 @@
     }
 
     function init() {//多分一番の大元
+       
+        // window.alert('33333');
+        
         n = rating_history.length;
         if (n == 0) return;
 
@@ -155,6 +162,8 @@
         initStatus();
         stage_status.update();
 
+        //window.alert('44444');  アラート→描画の順番なのはなぜなのか
+
         cj.Ticker.setFPS(60);
         cj.Ticker.addEventListener("tick", handleTick);
 
@@ -162,6 +171,8 @@
             updateParticles();
             stage_status.update();
         }
+       
+
     }
 
     function getPer(x, l, r) {
