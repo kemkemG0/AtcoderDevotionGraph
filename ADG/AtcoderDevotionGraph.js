@@ -12,10 +12,9 @@
 
 // ==/UserScript==
 
+"use strict";
 
-
-
-(function () {
+(async () => {
 
     //##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##
 
@@ -29,8 +28,6 @@
         $("html").remove(); // ページをまるごと削除
         document.write(copyPage); // コピーしてあったページ内容をペースト
 
-        //window.alert("11111")
-
     })()
 
 
@@ -38,9 +35,37 @@
 
 
 
-    "use strict";
+    const username = document.getElementsByClassName("username")[0].textContent;
+
+    const res = await fetch("https://kenkoooo.com/atcoder/atcoder-api/results?user=" + username);
+    let allJson = await res.json()
+
+    let devoting_rating_history = []
+
+    for (let i = 0; i < allJson.length; i++) {
+        if (allJson[i].result == 'AC' && allJson[i].point <= 3000) devoting_rating_history.push({ ...allJson[i] });
+    }
+    function compare(a, b) { return a.epoch_second - b.epoch_second; }//比較関数
+    devoting_rating_history.sort(compare);//時間順にソート
+
+
+    for (let i = 0; i < devoting_rating_history.length - 1; i++) {//合計の累積和的な
+        devoting_rating_history[i + 1].point += devoting_rating_history[i].point;
+        devoting_rating_history[i].point /= 100;
+    }
+    devoting_rating_history[devoting_rating_history.length - 1].point /= 100;
+    //今までの累積和/100　が高さ
+
+    console.log(devoting_rating_history);
+
+
+
+
+
 
     $(window).load(init);//ページの構成を全部把握してからinit()実行
+
+
     //init()
 
     // window.alert('22222');
@@ -99,6 +124,11 @@
     let chart_container, line_shape, vertex_shapes, highest_shape;
     let n, x_min, x_max, y_min, y_max;
 
+    //devoting graph
+    let devoting_panel_shape, devoting_border_shape;
+    let devoting_chart_container, devoting_line_shape, devoting_vertex_shapes, devoting_highest_shape;
+    let devoting_n, devoting_x_min, devoting_x_max, devoting_y_min, devoting_y_max;
+
     // status
     let border_status_shape;
     let rating_text, place_text, diff_text, date_text, contest_name_text;
@@ -143,16 +173,20 @@
         return t;
     }
 
+
+
     //多分一番の大元
     function init() {
 
         // window.alert('33333');
 
-
         //rating_history はHTML内で取得してある
         //rating_history=[{"EndTime":時間(単位不明),"NewRating":11,"OldRating":0,"Place":5200,"ContestName":"コンテスト名","StandingsUrl":"/contests/m-solutions2020/standings?watching=kemkemG0"}];
         n = rating_history.length;
+        devoting_n = devoting_rating_history.length;
         if (n == 0) return;
+
+        //console.log("initの中")
 
         //土台のステージ　これに図形とかを追加していくイメージ
         stage_graph = new cj.Stage("ratingGraph");// Stage("canvasのID"); 
@@ -176,9 +210,35 @@
         y_min = Math.min(1500, Math.max(0, y_min - MARGIN_VAL_Y_LOW));//いい感じに高さも設定
         y_max += MARGIN_VAL_Y_HIGH;
 
+        //精進グラフのサイズ決定
+        devoting_x_min = 100000000000;
+        devoting_x_max = 0;
+        devoting_y_min = 10000;
+        devoting_y_max = 0;
+        for (let i = 0; i < n; i++) {
+            devoting_x_min = Math.min(devoting_x_min, devoting_rating_history[i].epoch_second);
+            devoting_x_max = Math.max(devoting_x_max, devoting_rating_history[i].epoch_second);
+            devoting_y_min = Math.min(devoting_y_min, devoting_rating_history[i].point);
+            devoting_y_max = Math.max(devoting_y_max, devoting_rating_history[i].point);
+        }
+        devoting_x_min -= MARGIN_VAL_X;//最初にコンテストに参加した日ー1ヶ月
+        devoting_x_max += MARGIN_VAL_X;//最後にコンテストに参加した日＋1ヶ月
+        devoting_y_min = Math.min(1500, Math.max(0, devoting_y_min - MARGIN_VAL_Y_LOW));//いい感じに高さも設定
+        devoting_y_max += MARGIN_VAL_Y_HIGH;
+
+
+        //形を決める まだ改善の余地あり
+        y_min = Math.min(y_min, devoting_y_min);
+        y_max = Math.max(y_max, devoting_y_max);
+        x_min = Math.min(x_min, devoting_x_min);
+        x_max = Math.max(x_max, devoting_x_max);
+
+
         initBackground();//背景の描画
         initChart();//プロットと直線の描画
-        //init精進チャート()も加える
+
+        initDevotingChart()
+
         stage_graph.update();
         initStatus();//グラフの上のコンテスト情報とかの描画
         stage_status.update();
@@ -298,46 +358,53 @@
         border_shape.graphics.s("#888").ss(1.5).rr(0, 0, PANEL_WIDTH, PANEL_HEIGHT, 2);
     }
 
+
     function initChart() {
-        chart_container = new cj.Container();
+        chart_container = new cj.Container();//コンテナでまとめると、同時に動かせたりして良い
         stage_graph.addChild(chart_container);
-        chart_container.shadow = new cj.Shadow("rgba(0,0,0,0.3)", 1, 2, 3);
+        chart_container.shadow = new cj.Shadow("rgba(0,0,0,0.3)", 1, 2, 3);//チャートの下に影
 
         line_shape = newShape(chart_container);
         highest_shape = newShape(chart_container);
         vertex_shapes = new Array();
 
-        function mouseoverVertex(e) {//マウスおいたら丸が大きくなるやつ
+        //マウスおいたら丸が大きくなるやつ
+        function mouseoverVertex(e) {
             vertex_shapes[e.target.i].scaleX = vertex_shapes[e.target.i].scaleY = 1.2;
             stage_graph.update();
             setStatus(rating_history[e.target.i], true);
         };
-
         function mouseoutVertex(e) {
             vertex_shapes[e.target.i].scaleX = vertex_shapes[e.target.i].scaleY = 1;
             stage_graph.update();
         };
+
         let highest_i = 0;
         for (let i = 0; i < n; i++) {
             if (rating_history[highest_i].NewRating < rating_history[i].NewRating) {
                 highest_i = i;
             }
         }
+        //historyの数だけ配列にpushしてイベントリスナーも設定
         for (let i = 0; i < n; i++) {
             vertex_shapes.push(newShape(chart_container));
-            vertex_shapes[i].graphics.s("#FFF");
-            if (i == highest_i) vertex_shapes[i].graphics.s("#000");
-            vertex_shapes[i].graphics.ss(0.5).f(getColor(rating_history[i].NewRating)[1]).dc(0, 0, 3.5);
+            vertex_shapes[i].graphics.beginStroke("#FFF");
+            if (i == highest_i) vertex_shapes[i].graphics.s("#000");//Highestなら外枠を黒に
+            vertex_shapes[i].graphics.setStrokeStyle(0.5).beginFill(getColor(rating_history[i].NewRating)[1]).dc(0, 0, 3.5);
+
             vertex_shapes[i].x = OFFSET_X + PANEL_WIDTH * getPer(rating_history[i].EndTime, x_min, x_max);
             vertex_shapes[i].y = OFFSET_Y + (PANEL_HEIGHT - PANEL_HEIGHT * getPer(rating_history[i].NewRating, y_min, y_max));
-            vertex_shapes[i].i = i;
+
+            vertex_shapes[i].i = i;//なにこれ？？
+
             let hitArea = new cj.Shape();
             hitArea.graphics.f("#000").dc(1.5, 1.5, 6);
             vertex_shapes[i].hitArea = hitArea;
             vertex_shapes[i].addEventListener("mouseover", mouseoverVertex);
             vertex_shapes[i].addEventListener("mouseout", mouseoutVertex);
         }
-        {
+
+        {//highest 関連
             let dx = 80;
             if ((x_min + x_max) / 2 < rating_history[highest_i].EndTime) dx = -80;
             let x = vertex_shapes[highest_i].x + dx;
@@ -350,14 +417,83 @@
             highest_shape.addEventListener("mouseover", mouseoverVertex);
             highest_shape.addEventListener("mouseout", mouseoutVertex);
         }
+
+
         for (let j = 0; j < 2; j++) {
             if (j == 0) line_shape.graphics.s("#AAA").ss(2);
-            else line_shape.graphics.s("#FFF").ss(0.5);
+            else line_shape.graphics.s("#FFF").ss(0.5);//線の種類を変えてる？　よくわからん
+
             line_shape.graphics.mt(vertex_shapes[0].x, vertex_shapes[0].y);
             for (let i = 0; i < n; i++) {
                 line_shape.graphics.lt(vertex_shapes[i].x, vertex_shapes[i].y);
             }
         }
+    }
+
+
+    function initDevotingChart() {
+        devoting_chart_container = new cj.Container();//コンテナでまとめると、同時に動かせたりして良い
+        stage_graph.addChild(devoting_chart_container);//これは devoting_じゃない
+        devoting_chart_container.shadow = new cj.Shadow("rgba(0,0,0,0.1)", 1, 2, 3);//チャートの下に影
+
+        devoting_line_shape = newShape(devoting_chart_container);
+        devoting_highest_shape = newShape(devoting_chart_container);
+        devoting_vertex_shapes = new Array();
+
+        //マウスおいたら丸が大きくなるやつ
+        // function mouseoverVertex(e) {
+        //     vertex_shapes[e.target.i].scaleX = vertex_shapes[e.target.i].scaleY = 1.2;
+        //     stage_graph.update();
+        //     setStatus(rating_history[e.target.i], true);
+        // };
+        // function mouseoutVertex(e) {
+        //     vertex_shapes[e.target.i].scaleX = vertex_shapes[e.target.i].scaleY = 1;
+        //     stage_graph.update();
+        // };
+
+        // let highest_i = 0;
+        // for (let i = 0; i < n; i++) {
+        //     if (rating_history[highest_i].point < rating_history[i].point) {
+        //         highest_i = i;
+        //     }
+        // }
+        //historyの数だけ配列にpushしてイベントリスナーも設定
+        for (let i = 0; i < devoting_n; i++) {
+            devoting_vertex_shapes.push(newShape(devoting_chart_container));
+            devoting_vertex_shapes[i].graphics.beginStroke("#FFF");
+            //if (i == highest_i) vertex_shapes[i].graphics.s("#000");
+            devoting_vertex_shapes[i].graphics.setStrokeStyle(0.1).beginFill(getColor(devoting_rating_history[i].point)[1]).dc(0, 0, 1.5);
+            devoting_vertex_shapes[i].x = OFFSET_X + PANEL_WIDTH * getPer(devoting_rating_history[i].epoch_second, x_min, x_max);//devotingじゃないほうに合わせる？
+            devoting_vertex_shapes[i].y = OFFSET_Y + (PANEL_HEIGHT - PANEL_HEIGHT * getPer(devoting_rating_history[i].point, y_min, y_max));
+            devoting_vertex_shapes[i].i = i;
+            let hitArea = new cj.Shape();
+            hitArea.graphics.f("#000").dc(1.5, 1.5, 6);
+            devoting_vertex_shapes[i].hitArea = hitArea;
+            // devoting_vertex_shapes[i].addEventListener("mouseover", mouseoverVertex);
+            // devoting_vertex_shapes[i].addEventListener("mouseout", mouseoutVertex);
+        }
+
+        // {//highest 関連
+        //     let dx = 80;
+        //     if ((x_min + x_max) / 2 < rating_history[highest_i].epoch_second) dx = -80;
+        //     let x = vertex_shapes[highest_i].x + dx;
+        //     let y = vertex_shapes[highest_i].y - 16;
+        //     highest_shape.graphics.s("#FFF").mt(vertex_shapes[highest_i].x, vertex_shapes[highest_i].y).lt(x, y);
+        //     highest_shape.graphics.s("#888").f("#FFF").rr(x - HIGHEST_WIDTH / 2, y - HIGHEST_HEIGHT / 2, HIGHEST_WIDTH, HIGHEST_HEIGHT, 2);
+        //     highest_shape.i = highest_i;
+        //     let highest_text = newText(stage_graph, x, y, "12px Lato");
+        //     highest_text.text = "Highest: " + rating_history[highest_i].point;
+        //     highest_shape.addEventListener("mouseover", mouseoverVertex);
+        //     highest_shape.addEventListener("mouseout", mouseoutVertex);
+        // }
+
+        //チャートの線関連
+        devoting_line_shape.graphics.s("#afb5b8").ss(1);
+        devoting_line_shape.graphics.mt(devoting_vertex_shapes[0].x, devoting_vertex_shapes[0].y);
+        for (let i = 0; i < devoting_rating_history.length; i++) {
+            devoting_line_shape.graphics.lt(devoting_vertex_shapes[i].x, devoting_vertex_shapes[i].y);
+        }
+
     }
 
     function initStatus() {
@@ -395,6 +531,7 @@
         return 0;
     }
 
+    //@#//@#//@#//@#//@#//@#//@#//  関係ない  //@#//@#//@#//@#//@#//@#//@#//@#//@#//@#
     function getOrdinal(x) {
         let s = ["th", "st", "nd", "rd"], v = x % 100;
         return x + (s[(v - 20) % 10] || s[v] || s[0]);
@@ -403,7 +540,6 @@
         let sign = x == 0 ? 'ﾂｱ' : (x < 0 ? '-' : '+');
         return sign + Math.abs(x);
     }
-
     function setStatus(data, particle_flag) {
         let date = new Date(data.EndTime * 1000);
         let rating = data.NewRating, old_rating = data.OldRating;
@@ -423,7 +559,7 @@
         }
         standings_url = data.StandingsUrl;
     }
-
+    //Particle は マウスオーバー時のくるくるのやつｗ
     function setParticle(particle, x, y, color, alpha, star_flag) {
         particle.x = x;
         particle.y = y;
@@ -442,7 +578,6 @@
         }
         particle.alpha = alpha;
     }
-
     function setParticles(num, color, alpha, rating) {
         for (let i = 0; i < PARTICLE_MAX; i++) {
             if (i < num) {
@@ -453,7 +588,6 @@
             }
         }
     }
-
     function updateParticle(particle) {
         if (particle.life <= 0) {
             particle.visible = false;
@@ -475,6 +609,9 @@
             }
         }
     }
+    //@#//@#//@#//@#//@#//@#//@#//  関係ない  //@#//@#//@#//@#//@#//@#//@#//@#//@#//@#
+
+
 
 
 
