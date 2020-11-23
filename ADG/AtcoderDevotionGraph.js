@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         AtcoderDevotionGraph
 // @namespace    http://atcoder.jp/
-// @version      0.2.0β
+// @version      0.2.1β
 // @description  Overlay your devoiting graph on your rating graph
 // @author       kemkemG0
 // @include      *://atcoder.jp/users*
 // @exclude      *://atcoder.jp/users/*/history
 // @grant        none
-// @require https://code.jquery.com/jquery-1.8.0.min.js
-//@run-at   document-end
+// @require      https://code.jquery.com/jquery-1.8.0.min.js
+//@run-at        document-end
 
 // ==/UserScript==
 
@@ -105,6 +105,7 @@
     let devoting_panel_shape, devoting_border_shape;
     let devoting_chart_container, devoting_line_shape, devoting_vertex_shapes, devoting_highest_shape;
     let devoting_n, devoting_x_min, devoting_x_max, devoting_y_min, devoting_y_max;
+    let devoting_rating_history = []
 
     // status
     let border_status_shape;
@@ -112,10 +113,16 @@
     let particles;
     let standings_url;
     const username = document.getElementsByClassName("username")[0].textContent;
+    let allJson;
+    try {
+        const res = await fetch("https://kenkoooo.com/atcoder/atcoder-api/results?user=" + username);
+        allJson = await res.json()
+    } catch (reaseon) { console.log('try失敗') }
 
-    const res = await fetch("https://kenkoooo.com/atcoder/atcoder-api/results?user=" + username);
-    let allJson = await res.json()
-    let devoting_rating_history = []
+
+    
+    console.log(111)
+
     for (let i = 0; i < allJson.length; i++) {
         if (allJson[i].result == 'AC' && allJson[i].point <= 3000) devoting_rating_history.push({ ...allJson[i] });
     }
@@ -129,15 +136,21 @@
     devoting_rating_history[devoting_rating_history.length - 1].point /= 100;
     //今までの累積和/100　が高さ
 
+    console.log(222)
 
-    window.addEventListener('load', (event) => {
-        init();
+
+
+        console.log("before init()")
+
+        
+        console.log("This should be excuted after init()")
+
         let shoujinButtonID = document.getElementById('shoujinButtonID');
         shoujinButtonID.addEventListener('click', function () {
             devoting_chart_container.visible = !devoting_chart_container.visible;
             stage_graph.update();
         });
-    });
+
 
     console.log(devoting_rating_history.length);
 
@@ -145,6 +158,7 @@
     //クリエイトjsとやらをつかっている
 
 
+    console.log(333)
 
 
     //いい感じにキャンバスの大きさを設定してマウスオーバーもONにする
@@ -237,22 +251,30 @@
         devoting_y_min = Math.min(1500, Math.max(0, devoting_y_min - MARGIN_VAL_Y_LOW));//いい感じに高さも設定
         devoting_y_max += MARGIN_VAL_Y_HIGH;
 
-
         //形を決める 
         y_min = Math.min(y_min, devoting_y_min);
         y_max = Math.max(y_max, devoting_y_max);
         x_min = Math.min(x_min, devoting_x_min);
         x_max = Math.max(x_max, devoting_x_max);
 
+        console.log("I'm in inside of init 111")
 
         initBackground();//背景の描画
         initChart();//プロットと直線の描画
 
+        console.log("I'm in inside of init 222")
+
         initDevotingChart()
 
+
+
         stage_graph.update();
+        console.log("I'm in inside of init 333")
+
         initStatus();//グラフの上のコンテスト情報とかの描画
         stage_status.update();
+
+
 
         //window.alert('44444');  アラート→描画の順番なのはなぜなのか
 
@@ -264,8 +286,6 @@
             updateParticles();
             stage_status.update();
         }
-
-
     }
 
     function getPer(x, l, r) {
@@ -318,6 +338,8 @@
         //https://createjs.com/docs/easeljs/classes/Graphics.html Graphics Classのドキュメント
         let y1 = 0;
 
+
+
         // グラフの中の正方形のパネルを色を設定
         for (let i = COLORS.length - 1; i >= 0; i--) {
             let y2 = PANEL_HEIGHT - PANEL_HEIGHT * getPer(COLORS[i][0], y_min, y_max);
@@ -327,6 +349,8 @@
             }
             y1 = y2;
         }
+        console.log('after FOR')
+
         //Y軸ラベルの設定
         for (let i = 0; i <= y_max; i += STEP_SIZE) {
             if (i >= y_min) {
@@ -612,7 +636,7 @@
 
 
 
-
+    init();
 
 
 })()
