@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         AtcoderDevotionGraph
 // @namespace    http://atcoder.jp/
-// @version      0.3.2β
+// @version      1.0.1
 // @description  Overlay your devoiting graph on your rating graph
 // @author       kemkemG0
 // @include      *://atcoder.jp/users*
 // @exclude      *://atcoder.jp/users/*?graph=rank
+// @exclude      *://atcoder.jp/users/*?graph=dist
 // @exclude      *://atcoder.jp/users/*/history*
 // @grant        none
 // @require      https://code.jquery.com/jquery-1.8.0.min.js
@@ -14,16 +15,16 @@
 // ==/UserScript==
 
 "use strict";
-let scriptsArray = $('script');
+
+ let scriptsArray = $('script');
 scriptsArray[14].remove(); // 対象のタグを消す記述 x[14]がグラフを読み込むjs
 //なんでこれ必要？？  -->>一度読み込んだscriptタグはDOMから消しても効果は残るからそれを消すため
-let copyPage = $("html").clone().html();
+ let copyPage = $("html").clone().html();
 $("html").remove();
 document.write(copyPage);
 
 //##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##//##
 
-//delete existing graph.js file and rewrite
 
 {
     const element = document.getElementsByClassName('btn-text-group')[document.getElementsByClassName('btn-text-group').length - 1];
