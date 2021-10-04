@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         AtcoderDevotionGraph
 // @namespace    http://atcoder.jp/
-// @version      1.0.1
-// @description  Overlay your devoiting graph on your rating graph
+// @version      1.0.2
+// @description  精進グラフを、通常のグラフの上に重ねて表示します
 // @author       kemkemG0
 // @include      *://atcoder.jp/users*
 // @exclude      *://atcoder.jp/users/*?graph=rank
